@@ -49,3 +49,4 @@ logs/
 
 # Environment variables
 .env
+visuals/figures/lesion_grid_1x_per_class.pdf

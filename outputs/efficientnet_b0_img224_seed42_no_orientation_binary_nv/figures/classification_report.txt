@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+      not_nv       0.85      0.84      0.84       603
+          nv       0.93      0.93      0.93      1377
+
+    accuracy                           0.91      1980
+   macro avg       0.89      0.89      0.89      1980
+weighted avg       0.91      0.91      0.91      1980

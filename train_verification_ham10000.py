@@ -146,22 +146,24 @@ class RandomApplyJitter(nn.Module):
 
 def build_transforms(img_size=224, is_train=True):
     if is_train:
+        # NO ORIENTATION-BASED AUGMENTATION: Removed RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip
+        # Simple resize is kept (non-augmenting) to maintain fixed input size for the model
+        # This version keeps ONLY color/intensity augmentations for verification purposes
         return transforms.Compose([
             transforms.ConvertImageDtype(torch.float32),
-            transforms.Resize(int(img_size * 1.15)),
-            transforms.RandomResizedCrop(img_size, scale=(0.7, 1.0), ratio=(0.8, 1.25)),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(p=0.2),
+            transforms.Resize((img_size, img_size)),  # Simple resize (no cropping/flipping)
+            # Keep only color jitter - NO spatial augmentations
             RandomApplyJitter(p=0.8, brightness=0.25, contrast=0.25, saturation=0.2, hue=0.02),
             # Normalize w/ ImageNet stats (since we use pretrained backbones)
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225]),
         ])
     else:
+        # NO ORIENTATION-BASED AUGMENTATION: Removed CenterCrop
+        # Simple resize is kept (non-augmenting) to maintain fixed input size for the model
         return transforms.Compose([
             transforms.ConvertImageDtype(torch.float32),
-            transforms.Resize(img_size),
-            transforms.CenterCrop(img_size),
+            transforms.Resize((img_size, img_size)),  # Simple resize (no cropping/flipping)
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225]),
         ])
@@ -357,16 +359,10 @@ def evaluate(model, loader, device, num_classes, tta=False):
         imgs = imgs.to(device, non_blocking=True)
         labels = labels.to(device, non_blocking=True)
 
-        if tta:
-            # simple TTA: original + hflip
-            logits1, prob1 = forward_once(imgs)
-            imgs_flip = torch.flip(imgs, dims=[3])
-            logits2, prob2 = forward_once(imgs_flip)
-            prob = (prob1 + prob2) / 2.0
-            preds = prob.argmax(dim=1)
-        else:
-            logits, prob = forward_once(imgs)
-            preds = logits.argmax(dim=1)
+        # TTA DISABLED: TTA uses horizontal flipping which is orientation-based
+        # Always use single forward pass for this verification
+        logits, prob = forward_once(imgs)
+        preds = logits.argmax(dim=1)
 
         total += imgs.size(0)
         correct += (preds == labels).sum().item()
@@ -502,8 +498,8 @@ def main():
     from copy import deepcopy
     ema = ModelEma(model, decay=args.ema_decay, device=device) if args.ema else None
 
-    # Outputs - Add "_binary_nv" suffix to distinguish binary classification
-    run_name = args.run_name or f"{args.backbone}_img{args.img_size}_seed{args.seed}_binary_nv"
+    # Outputs - Add suffixes to indicate: no orientation augmentation + binary nv classification
+    run_name = args.run_name or f"{args.backbone}_img{args.img_size}_seed{args.seed}_no_orientation_binary_nv"
     out_dir = Path("outputs") / run_name
     (out_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
     (out_dir / "gradcam").mkdir(parents=True, exist_ok=True)
